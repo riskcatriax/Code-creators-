@@ -1,0 +1,105 @@
+
+
+
+import React, { useState } from 'react';
+// import { Base64 } from 'js-base64';
+// import axios from 'axios';
+
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+
+const App = () => {
+  const [jobDescription, setJobDescription] = useState('');
+  const [resume, setResume] = useState(null);
+  const [atsScore, setAtsScore] = useState(null);
+  const [interviewQuestions, setInterviewQuestions] = useState([]);
+
+  const genAI = new GoogleGenerativeAI("AIzaSyCY3yjmaG1jQpd6MEGKj_nHxWZxcLsoZ98");
+  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onloadend = () => {
+        setResume(reader.result);
+      };
+    }
+  };
+  const handleSubmit = async () => {
+    const formData = {
+      jobDescription,
+      resume: resume.replace(/^data:application\/pdf;base64,/, '')
+    };
+
+    try {
+      let prompt = "Hey Act Like a skilled or very experience ATS (Application Tracking System)" +
+                  " Assign the percentage Matching based on the missing keywords with high accuracy"+
+                  " resume: {" + formData.resume + " }" +
+                  " description: {" + formData.jobDescription +" }"+
+                  " I want the response only in below format"+
+                  " JD_Match : '%' ";
+
+      const response = await model.generateContent(prompt);
+      // console.log('Response: ', response.response.text());
+
+      const regex = /\d{1,2}%/;
+
+      const responseAtsScore = response.response.text().match(regex);
+      console.log(response.response.text());
+      console.log(responseAtsScore);
+      setAtsScore(responseAtsScore[0].slice(0, -1));
+    
+    } catch (error) {
+      console.error('Error submitting the form', error);
+    }
+  };
+
+  const handleGenerateQuestions = async () => {
+    try {
+      const response = await model.generateContent("Create interview questrion for " +
+                                          " job Description: { "+ jobDescription +" } "+
+                                          "I want the response as array of questions" );
+      console.log(response.response.text());
+      setInterviewQuestions(response.response.text());
+    } catch (error) {
+      console.error('Error generating questions', error);
+    }
+  };
+
+  return (
+    <div>
+      <h1>Job Application</h1>
+      <textarea
+        placeholder="Upload Job Description"
+        value={jobDescription}
+        onChange={(e) => setJobDescription(e.target.value)}
+      />
+      <input type="file" accept=".pdf" onChange={handleFileUpload} />
+      <button onClick={handleSubmit}>Submit</button>
+
+      {atsScore !== null && (
+        <div>
+          <progress value={atsScore} max="100">{atsScore}%</progress>
+          {atsScore > 20 && (
+            <div>
+              <button onClick={handleGenerateQuestions} style={{ backgroundColor: 'green', color: 'white' }}>
+                Generate Interview Questions
+              </button>
+              {/* <ul>
+                {interviewQuestions.map((question, index) => (
+                  <li key={index}>{question}</li>
+                ))}
+              </ul> */}
+              {interviewQuestions}
+
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default App;
+
